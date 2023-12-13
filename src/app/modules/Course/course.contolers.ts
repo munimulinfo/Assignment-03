@@ -28,7 +28,6 @@ const updateCourse = catchAsync(async (req, res) => {
 
 const getAllCourseWithFiltaring = catchAsync(async (req, res) => {
   const allQuery = req.query;
-  console.log(allQuery);
   const result = await CourseServices.getAllCoursesDataFromDb(allQuery);
   sendResponse(res, {
     success: true,

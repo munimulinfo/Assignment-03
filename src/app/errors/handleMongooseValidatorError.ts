@@ -1,27 +1,16 @@
 import mongoose from 'mongoose';
-import {
-  TErrorSources,
-  TGenericErrorResponse,
-} from '../errorInterface/error.interface';
-
-const handleMongooseValidationError = (
-  err: mongoose.Error.ValidationError,
-): TGenericErrorResponse => {
-  const errorSources: TErrorSources = Object.values(err.errors).map(
-    (val: mongoose.Error.ValidatorError | mongoose.Error.CastError) => {
-      return {
-        path: val?.path,
-        message: val?.message,
-      };
-    },
-  );
-
+const handleMongooseValidationError = (err: mongoose.Error.ValidationError) => {
   const statusCode = 400;
 
+  const errorDetails = Object.values(err.errors).map(
+    (val: mongoose.Error.ValidatorError | mongoose.Error.CastError) => val,
+  );
+  const errorMessage = `${errorDetails[0].value} is not valid id`;
   return {
     statusCode,
-    message: 'Validation Error',
-    errorSources,
+    message: 'Id is invalid',
+    errorMessage,
+    errorDetails,
   };
 };
 

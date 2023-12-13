@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type QueryParams = {
+export type QueryParams = {
   minPrice?: number;
   maxPrice?: number;
   tags?: string;
@@ -9,6 +9,16 @@ type QueryParams = {
   provider?: string;
   durationInWeeks?: number;
   level?: string;
+  sortBy?:
+    | 'title'
+    | 'price'
+    | 'startDate'
+    | 'endDate'
+    | 'language'
+    | 'durationInWeeks'; // Specify valid sort fields
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 };
 
 const buildQuery = (queryParams: QueryParams) => {
@@ -39,6 +49,7 @@ const buildQuery = (queryParams: QueryParams) => {
   if (queryParams?.level) {
     query['details.level'] = queryParams?.level;
   }
+
   return query;
 };
 

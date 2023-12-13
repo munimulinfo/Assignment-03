@@ -18,7 +18,6 @@ async function main() {
 main();
 
 //Asynccronus unhandleRejection listener
-
 process.on('unhandledRejection', () => {
   console.log(`😈 unahandledRejection is detected , shutting down ...`);
   if (server) {
@@ -30,7 +29,6 @@ process.on('unhandledRejection', () => {
 });
 
 //syncronus code uncaughtException listenre
-
 process.on('uncaughtException', () => {
   console.log(`😈 uncaughtException is detected , shutting down ...`);
   process.exit(1);

@@ -1,8 +1,7 @@
 import { Types } from 'mongoose';
-import { TReview } from '../Review/review.interface';
 
 export type TDetails = {
-  level: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
 };
 
@@ -23,5 +22,4 @@ export type TCourse = {
   provider: string;
   details: TDetails;
   durationInWeeks?: number;
-  reviews?: TReview[];
 };

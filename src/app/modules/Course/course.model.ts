@@ -1,26 +1,24 @@
 import { Schema, model } from 'mongoose';
 import { TCourse, TDetails, Tag } from './course.interface';
-// import { TReview } from '../Review/review.interface';
 
 const detailsSchema = new Schema<TDetails>({
-  level: { type: String, required: true },
+  level: {
+    type: String,
+    enum: ['Beginner', 'Intermediate', 'Advanced'],
+    required: true,
+  },
   description: { type: String, required: true },
 });
 
-// const reviewsSchema = new Schema<TReview>({
-//   courseId: { type: Schema.Types.ObjectId, required: true },
-//   rating: {
-//     type: Number,
-//     enum: [1, 2, 3, 4, 5],
-//     required: true,
-//   },
-//   review: { type: String, required: true },
-// });
-
-const tagSchema = new Schema<Tag>({
-  name: { type: String, required: true },
-  isDeleted: { type: Boolean, required: true },
-});
+const tagSchema = new Schema<Tag>(
+  {
+    name: { type: String, required: true },
+    isDeleted: { type: Boolean, required: true },
+  },
+  {
+    _id: false,
+  },
+);
 
 const courseSchema = new Schema<TCourse>(
   {
@@ -39,7 +37,6 @@ const courseSchema = new Schema<TCourse>(
     provider: { type: String, required: true },
     durationInWeeks: { type: Number },
     details: detailsSchema,
-    // reviews: [{ type: reviewsSchema }],
   },
   {
     toJSON: {
@@ -62,6 +59,14 @@ courseSchema.pre('save', function (next) {
     const timeDiff = Math.abs(endDate.getTime() - startDate.getTime());
     const durationInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
     this.durationInWeeks = Math.ceil(durationInDays / 7);
+  }
+  next();
+});
+
+courseSchema.pre('save', async function (next) {
+  const existingCourse = await CourseModel.findOne({ title: this?.title });
+  if (existingCourse) {
+    throw new Error(`${existingCourse?.title} Already Exists`);
   }
   next();
 });

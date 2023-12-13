@@ -1,5 +1,5 @@
-import buildQuery from '../../buillder/buildQuery';
-// import { ReviewModel } from '../Review/review.model';
+import mongoose from 'mongoose';
+import buildQuery, { QueryParams } from '../../buillder/buildQuery';
 import { TCourse } from './course.interface';
 import { CourseModel } from './course.model';
 
@@ -14,49 +14,162 @@ const updateCourseInToDb = async (
 ) => {
   const { tags, details, ...remainingCourseData } = payload;
 
-  const modifiedUpdatedData: Record<string, unknown> = {
-    ...remainingCourseData,
-  };
-
-  if (details && Object.keys(details).length) {
-    for (const [key, value] of Object.entries(details)) {
-      modifiedUpdatedData[`details.${key}`] = value;
-    }
-  }
-
-  if (tags && tags.length) {
-    tags.forEach((tag, index) => {
-      for (const [key, value] of Object.entries(tag)) {
-        modifiedUpdatedData[`tags.${index}.${key}`] = value;
+  const session = await mongoose.startSession();
+  let updatedResult;
+  try {
+    session.startTransaction();
+    const modifiedUpdatedData: Record<string, unknown> = {
+      ...remainingCourseData,
+    };
+    if (details && Object.keys(details).length) {
+      for (const [key, value] of Object.entries(details)) {
+        modifiedUpdatedData[`details.${key}`] = value;
       }
-    });
+    }
+    const updatedBasiCourse = await CourseModel.findByIdAndUpdate(
+      courseId,
+      modifiedUpdatedData,
+      {
+        new: true,
+        runValidators: true,
+        session,
+      },
+    );
+
+    if (!updatedBasiCourse) {
+      throw new Error('Failed to update course');
+    }
+    updatedResult = updatedBasiCourse;
+    //chks tags are availabel
+    if (tags && tags.length > 0) {
+      const deletedtags = tags
+        .filter((el) => el?.name && el?.isDeleted)
+        .map((el) => el?.name);
+
+      const deletedtagss = await CourseModel.findByIdAndUpdate(
+        courseId,
+        {
+          $pull: {
+            tags: { name: { $in: deletedtags } },
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+          session,
+        },
+      );
+
+      if (!deletedtagss) {
+        throw new Error('Failed to update tags');
+      }
+      updatedResult = deletedtagss;
+
+      // filter out the new course fields
+      const newAddTag = tags?.filter((el) => el.name && !el.isDeleted);
+
+      const newTagsAdd = await CourseModel.findByIdAndUpdate(
+        courseId,
+        {
+          $addToSet: { tags: { $each: newAddTag } },
+        },
+        {
+          new: true,
+          runValidators: true,
+          session,
+        },
+      );
+      if (!newTagsAdd) {
+        throw new Error('Failed to add new tags');
+      }
+
+      updatedResult = newTagsAdd;
+    }
+    await session.commitTransaction();
+    await session.endSession();
+    return updatedResult;
+  } catch (error) {
+    await session.abortTransaction();
+    await session.endSession();
+    throw new Error('Failed to update course');
   }
 
-  const result = await CourseModel.findByIdAndUpdate(
-    courseId,
-    modifiedUpdatedData,
-    {
-      new: true,
-      runValidators: true,
-    },
-  );
-  return result;
+  // if (tags && tags.length) {
+  //   tags.forEach((tag, index) => {
+  //     for (const [key, value] of Object.entries(tag)) {
+  //       modifiedUpdatedData[`tags.${index}.${key}`] = value;
+  //     }
+  //   });
+  // }
 };
 
+// const getAllCoursesDataFromDb = async (
+//   queryParams: Record<string, unknown>,
+// ) => {
+//   const page = (queryParams?.page as number) || 1;
+//   const limit = (queryParams?.limit as number) || 10;
+//   const query = buildQuery(queryParams);
+//   const total = await CourseModel.countDocuments(query);
+
+//   const result = await CourseModel.find(query)
+//     .sort({
+//       [queryParams?.sortBy as string]:
+//         queryParams?.sortOrder === 'asc' ? 1 : -1,
+//     })
+//     .skip((page - 1) * limit)
+//     .limit(Number(limit))
+//     .lean();
+//   const meta = {
+//     total: total,
+//     page: page,
+//     limit: limit,
+//   };
+
+//   return { meta, result };
+// };
+
 const getAllCoursesDataFromDb = async (
-  queryParams: Record<string, unknown>,
-) => {
+  queryParams: QueryParams,
+  // eslint-disable-next-line no-undef
+): Promise<{
+  meta: { total: number; page: number; limit: number };
+  result: TCourse[];
+}> => {
+  const page = (queryParams?.page as number) || 1;
+  const limit = (queryParams?.limit as number) || 10;
   const query = buildQuery(queryParams);
+  const total = await CourseModel?.countDocuments(query);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sortCriteria: Record<string, any> = {};
+  if (
+    queryParams?.sortBy &&
+    [
+      'title',
+      'price',
+      'startDate',
+      'endDate',
+      'language',
+      'durationInWeeks',
+    ].includes(queryParams?.sortBy)
+  ) {
+    sortCriteria[queryParams.sortBy] =
+      queryParams?.sortOrder === 'asc' ? 1 : -1;
+  }
 
   const result = await CourseModel.find(query)
-    .sort({
-      [queryParams?.sortBy as string]:
-        queryParams?.sortOrder === 'asc' ? 1 : -1,
-    })
-    .skip(((queryParams?.page as number) - 1) * (queryParams?.limit as number))
-    .limit(Number(queryParams?.limit as number));
+    .sort(sortCriteria)
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .lean();
 
-  return result;
+  const meta = {
+    total: total,
+    page: page,
+    limit: limit,
+  };
+
+  return { meta, result };
 };
 
 const getSingleCourseWithReviewFromDb = async (courseId: string) => {
